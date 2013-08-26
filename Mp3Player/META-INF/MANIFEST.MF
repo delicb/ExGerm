@@ -1,0 +1,14 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: Mp3Player
+Bundle-SymbolicName: Mp3Player
+Bundle-Version: 1.0.0
+Bundle-Activator: tk.exgerm.mp3player.Activator
+Bundle-Vendor: Tim 2
+Bundle-RequiredExecutionEnvironment: JavaSE-1.6
+Import-Package: org.osgi.framework;version="1.3.0",
+ tk.exgerm.core.plugin,
+ tk.exgerm.core.service
+Bundle-ActivationPolicy: lazy
+Bundle-ClassPath: .,lib/jl1.0.jar
+Bundle-UpdateLocation: http://exgerm.bloggernauts.net/plugins/Mp3Player.jar

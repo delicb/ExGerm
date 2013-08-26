@@ -1,0 +1,15 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: GraphTree
+Bundle-SymbolicName: GraphTree
+Bundle-Version: 1.0.0
+Bundle-Vendor: Tim 2
+Bundle-RequiredExecutionEnvironment: JavaSE-1.6
+Import-Package: org.osgi.framework;version="1.4.0",
+ tk.exgerm.core.exception,
+ tk.exgerm.core.model,
+ tk.exgerm.core.plugin,
+ tk.exgerm.core.service
+Bundle-Activator: tk.exgerm.graphtree.Activator
+Bundle-ActivationPolicy: lazy
+Bundle-UpdateLocation: http://exgerm.bloggernauts.net/plugins/GraphTree.jar

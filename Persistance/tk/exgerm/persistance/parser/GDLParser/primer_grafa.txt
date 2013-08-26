@@ -1,0 +1,61 @@
+/*
+* Ovo je primer grafa za testiranje persera...
+*/
+graph "Graph Exampple1" { // komentar u jednom redu
+
+	[
+		jos_atributa=0x15,
+		"1 2 3 4"="4 3 2 1",
+		name=Graph1,
+		"test test"="o jea baby"
+	]
+	graph "subgraph 1" {
+
+		[
+			label="Atribut\" podgrafa"
+		]
+		node prvi;
+
+		node drugi;
+
+		edge drugi -> prvi;
+	}
+
+	node prvi
+	[
+		color=black,
+		label=prvi
+	];
+
+	node cetvrti;
+
+	node "treci\" nod"
+	[
+		label=ne_mora_biti_isto_kao_ime
+	];
+
+	node drugi
+	[
+		color=yellow,
+		label=drugi
+	];
+
+	edge prvi -- drugi
+		[
+			color=red
+		];
+
+	edge prvi -> "treci\" nod";
+
+	edge "treci\" nod" -> cetvrti;
+
+	edge cetvrti -> prvi
+		[
+			style=dotted
+		];
+
+	edge prvi -- "subgraph 1"
+		[
+			style=dotted
+		];
+}

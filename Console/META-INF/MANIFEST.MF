@@ -1,0 +1,16 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: Console
+Bundle-SymbolicName: Console
+Bundle-Version: 1.0.0
+Bundle-RequiredExecutionEnvironment: JavaSE-1.6
+Bundle-Vendor: Tim 2
+Import-Package: org.osgi.framework;version="1.4.0",
+ tk.exgerm.core.exception,
+ tk.exgerm.core.model,
+ tk.exgerm.core.plugin,
+ tk.exgerm.core.service
+Bundle-Activator: tk.exgerm.console.Activator
+Bundle-ActivationPolicy: lazy
+Bundle-UpdateLocation: http://exgerm.bloggernauts.net/plugins/Console.jar
+Bundle-ClassPath: .,lib/l2fprod-common-fontchooser.jar

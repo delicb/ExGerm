@@ -1,0 +1,12 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: Persistance
+Bundle-SymbolicName: Persistance
+Bundle-Version: 1.0.0
+Bundle-Vendor: Tim 2
+Import-Package: org.osgi.framework;version="1.4.0",
+ tk.exgerm.core.plugin
+Bundle-Activator: tk.exgerm.persistance.Activator
+Require-Bundle: Core;bundle-version="1.0.0"
+Bundle-RequiredExecutionEnvironment: JavaSE-1.6
+Bundle-UpdateLocation: http://exgerm.bloggernauts.net/plugins/Persistance.jar

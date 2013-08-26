@@ -1,0 +1,392 @@
+/**
+ * @author Tim 2
+ * @date 25.5.2009.
+ *
+ * Gramatika za ExGERM Graph Definition Language
+ * Na osnovu ovog fajla se generiše čitav skener i parser.
+ */
+
+options {
+  JDK_VERSION = "1.6";
+  STATIC = false;
+}
+
+PARSER_BEGIN(GDL)
+package tk.exgerm.persistance.parser.GDLParser;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+
+import java.util.Stack;
+import java.util.List;
+import java.util.ArrayList;
+
+import tk.exgerm.persistance.parser.Parser;
+import tk.exgerm.persistance.parser.InternalParseException;
+
+import tk.exgerm.core.service.ICoreContext;
+import tk.exgerm.core.model.IGraph;
+import tk.exgerm.core.model.INode;
+import tk.exgerm.core.model.IEdge;
+import tk.exgerm.core.exception.ExGNodeAlreadyExsistException;
+import tk.exgerm.core.exception.ExGNameConflictException;
+
+/**
+ * Na osnovi zadatog GDL jezika parsira dati file.
+ *
+ */
+public class GDL implements Parser{
+	ICoreContext context;
+	List<Object> activeObjects;
+	Stack<IGraph> graphStack;
+	INode nodeToConnect;
+	String graphName;
+	
+	public GDL(ICoreContext context, File f, String graphName) throws FileNotFoundException {
+		this(context, f);
+		this.graphName = graphName;
+	}
+		
+	public GDL(ICoreContext context, File f) throws FileNotFoundException {
+		this(new FileInputStream(f));
+		this.context = context;
+		graphStack = new Stack<IGraph>();
+		activeObjects = new ArrayList<Object>();
+	}
+	
+	public IGraph parse() throws InternalParseException {
+	  	try	  	{			graph();
+		}
+		catch (ParseException e)		{			throw new InternalParseException(e.getMessage());
+		}			if (graphStack.size() != 1) {
+			throw new InternalParseException("Unknown error occured!");
+		}
+		return graphStack.pop();	}
+	
+	public void createGraph(String name, int kind) throws ParseException {
+		String newName = null;
+		String n = null;
+		if (kind == GDLConstants.STRING_LITERAL) 
+			n = sanitizeString(name);
+		else
+			n = name;
+		
+		// samo za TLG (top level graph :) ) provaravamo da li mu treba promeniti ime
+		if (graphStack.size() == 0) {
+			newName = (graphName != null ? graphName : n);
+			if (context.getGraph(newName) != null)
+				throw new ParseException("Graph " + newName + " already exists in register.");
+		}
+		else 
+			newName = n;
+
+		IGraph g = context.newGraph(newName);
+		graphStack.push(g);
+		activeObjects.add(g);
+	}
+	
+	public void createNode(String name, int kind) throws ParseException {
+		String nodeName = null;
+		if (kind == GDLConstants.STRING_LITERAL)
+			nodeName = sanitizeString(name);
+		else
+			nodeName = name;
+		INode n = context.newNode(nodeName);
+		try {
+			graphStack.peek().addNode(n);
+			activeObjects.add(n);
+		} 
+		catch (ExGNodeAlreadyExsistException e) {
+			throw new ParseException("Node " + name + " allready defined");
+		}
+	}
+
+	public void graphEnded() {
+		// ovo radimo samo ako nismo dosli do kraja sa vracanjem ugnjezdenih grafova
+		if (graphStack.size() > 1) {
+			IGraph g = graphStack.pop();
+			try {
+				graphStack.peek().addNode(g);
+			} 
+			catch (ExGNodeAlreadyExsistException e) {
+				System.err.println(e.getMessage());	
+			}
+		}
+	}
+	
+	public void setNodeToConnect(String node, int kind) throws ParseException {
+		String nodeName = null;
+		if (kind ==  GDLConstants.STRING_LITERAL)
+			nodeName = sanitizeString(node);
+		else
+			nodeName = node;
+		IGraph g = graphStack.peek();
+		INode n = g.getNode(nodeName);
+		if (n == null) {
+			throw new ParseException("Node " + node + " is undefined");
+		}
+		else {
+			nodeToConnect = n;
+		}	
+	}
+	
+	public void invalidateNodeToConnect() {
+		nodeToConnect = null;	
+	}
+
+	public void invalidateActiveObjects()	{
+		activeObjects.clear();
+	}
+	
+	public void connectToPreviousNode(String node, int kind, int direction) throws ParseException {
+		String nodeName = null;
+		if (kind == GDLConstants.STRING_LITERAL)
+			nodeName = sanitizeString(node);
+		else
+			nodeName = node;
+		IGraph g = graphStack.peek();
+		INode n = g.getNode(nodeName);
+		if (n == null) 
+			throw new ParseException("Node " + node + " is undefined");
+			
+		boolean directed;
+		if (direction == GDLConstants.UNDIRECTED)
+			directed = false;
+		else
+			directed = true;
+		
+		IEdge e = null;
+		if (!directed) {
+			e = context.newEdge(nodeToConnect, n);
+		}	
+		else {
+			if (direction == GDLConstants.LEFT) {
+				e = context.newEdge(n, nodeToConnect);
+				e.setDirected(true);
+			}
+			
+			if (direction == GDLConstants.RIGHT) {
+				e = context.newEdge(nodeToConnect, n);
+				e.setDirected(true);
+			}
+		}
+		g.addEdge(e);
+		activeObjects.add(e);
+	}
+	
+	public void setAttribute(String key, int keyKind, String value, int valueKind) {
+		String k = null;
+		if (keyKind == GDLConstants.STRING_LITERAL)
+			k = sanitizeString(key);
+		else
+			k = key;
+		Object v = null;
+		
+		switch (valueKind) {
+			case GDLConstants.ID:
+				v = value;
+				break;	
+			case GDLConstants.INTEGER_LITERAL:
+				v = Integer.parseInt(value);
+				break;
+			case GDLConstants.FLOATING_POINT_LITERAL:
+				v = Float.parseFloat(value);
+				break;
+			case GDLConstants.STRING_LITERAL:
+				v = sanitizeString(value);
+				break;
+			default:
+				break;
+		}
+		if (v != null)
+			setAttributeToActiveObject(k, v);
+	}
+	
+	public void setAttributeToActiveObject(String key, Object value) {
+	  for (Object activeObject: activeObjects) {
+			if (activeObject instanceof IGraph) {
+				((IGraph)activeObject).setAttribute(key, value);
+				continue;
+			}
+			if (activeObject instanceof INode) { 
+				((INode)activeObject).setAttribute(key, value);
+				continue;
+			}
+			if (activeObject instanceof IEdge) { 
+				((IEdge)activeObject).setAttribute(key, value);
+				continue;
+			}
+		}
+	}
+
+	/**
+	* Izbacuje sve sto nije validno slovo
+	*/
+	public String sanitizeString(String s) {
+		String rez = s;
+		// uklanjanje navodnika na pocetku
+		rez = rez.replaceFirst("^\"", "");
+
+		// uklanjanje navodnika na kraju		rez = rez.replaceFirst("\"$", "");
+
+		// uklanjanje escape znaka izpred navodnika u sred stringa		
+		rez = rez.replaceAll("\\\\\"", "\"");
+
+		// sve ostalo dopustamo		return rez;
+	}
+}
+PARSER_END(GDL)
+
+// multiline komentari
+SKIP: {
+	"/*" : IN_COMMENT	
+}
+
+<IN_COMMENT>
+SKIP: {
+	< ~[] >	
+}
+
+<IN_COMMENT>
+SKIP: {
+	"*/" : DEFAULT	
+}
+
+// oneline komentari
+SKIP: {
+	<"//" (~["\n","\r"])* ("\n" | "\r" | "\r\n")>	
+}
+
+// blank spaces
+SKIP: {
+	" "
+|	"\t"
+|  "\n"
+|  "\r"
+|  "\r\n"
+}
+
+// kljucne reci
+TOKEN: {
+	<GRAPH: "graph">
+|	<NODE: "node">
+|	<EDGE: "edge">	
+}
+
+// identifikator
+TOKEN: {
+	<ID: (<LETTER> | <DIGIT>)+>	
+|	< #HEX_DIGIT: (["0"-"9","a"-"f","A"-"F"]) >
+|	< #LETTER: ["$","A"-"Z","_","a"-"z"] >
+|	< #DIGIT: ["0"-"9"] >
+}
+
+// vrednosti - preuzeto iz C gramatike
+TOKEN : {
+    <INTEGER_LITERAL: <DECIMAL_LITERAL>>
+|   <DECIMAL_LITERAL: ["1"-"9"] (["0"-"9"])*>
+|   <FLOATING_POINT_LITERAL: (["0"-"9"])+ "." (["0"-"9"])*>
+|   <STRING_LITERAL: "\"" ( ~["\"","\\","\n","\r"] | "\\" ( ["n","t","b","r","f","\\","\'","\""] | ["0"-"7"] (["0"-"7"])?  | ["0"-"3"] ["0"-"7"] ["0"-"7"] | ( ["\n","\r"] | "\r\n")))* "\"">
+}
+
+
+
+// smer veze
+TOKEN: {
+	<UNDIRECTED: "--">
+|	<RIGHT: "->">
+|	<LEFT: "<-">
+}
+
+// specijalni znaci
+TOKEN: {
+	< LBRACE: "{" >
+|	< RBRACE: "}" >
+|	< LBRACKET: "[" >
+|	< RBRACKET: "]" >
+|	< SEMICOLON: ";" >
+|	< EQ: "=">
+|	<COMMA: ",">
+}
+
+
+
+void graph(): {invalidateActiveObjects();}
+{
+	<GRAPH> {createGraph(getToken(1).image, getToken(1).kind);} id() <LBRACE> stmt_list() <RBRACE> {graphEnded();}
+}
+
+void id(): {}
+{
+	<ID> | <STRING_LITERAL>	
+}
+
+void stmt_list(): {}
+{
+	(stmt())*
+}
+
+void stmt(): {}
+{
+	graph() | attr_list() | node_stmt() | edge_stmt()
+}
+
+void attr_list(): {}
+{
+	<LBRACKET> attr() (<COMMA> attr())* <RBRACKET>
+}
+
+void attr(): {}
+{
+	{
+		setAttribute(getToken(1).image, getToken(1).kind, getToken(3).image, getToken(3).kind);		
+	}
+	id() <EQ> value()
+}
+
+void value(): {}
+{
+	<INTEGER_LITERAL> | <FLOATING_POINT_LITERAL> | <STRING_LITERAL> | <ID>
+}
+
+void node_stmt(): {invalidateActiveObjects();}
+{
+	<NODE> id() {createNode(getToken(0).image, getToken(0).kind);}	(
+	  <COMMA> <NODE> id()
+	  {		createNode(getToken(0).image, getToken(0).kind);
+	  }	)*
+	 (attr_list())? <SEMICOLON>
+}
+
+void edge_stmt(): {invalidateActiveObjects();}
+{
+	<EDGE> id()
+	{
+		setNodeToConnect(getToken(0).image, getToken(0).kind);
+		connectToPreviousNode(getToken(2).image, getToken(2).kind, getToken(1).kind);
+	}
+	connection_direction() 
+	id() 
+	{
+		setNodeToConnect(getToken(0).image, getToken(0).kind);
+	} 
+	(
+		{
+			connectToPreviousNode(getToken(2).image, getToken(2).kind, getToken(1).kind);
+		}
+		connection_direction() id() 
+		{
+			setNodeToConnect(getToken(0).image, getToken(0).kind);
+		} 
+	)* 
+	{
+		invalidateNodeToConnect();
+	} 
+	(attr_list())? <SEMICOLON>
+}
+
+void connection_direction(): {}
+{
+	<UNDIRECTED> | <LEFT> | <RIGHT>	
+}
